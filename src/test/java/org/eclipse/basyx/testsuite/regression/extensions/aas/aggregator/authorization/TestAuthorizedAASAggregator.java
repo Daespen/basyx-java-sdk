@@ -26,16 +26,23 @@ package org.eclipse.basyx.testsuite.regression.extensions.aas.aggregator.authori
 
 import java.util.Collection;
 import java.util.Collections;
-
 import org.eclipse.basyx.aas.aggregator.api.IAASAggregator;
 import org.eclipse.basyx.aas.metamodel.api.IAssetAdministrationShell;
 import org.eclipse.basyx.aas.metamodel.map.AssetAdministrationShell;
 import org.eclipse.basyx.aas.metamodel.map.descriptor.ModelUrn;
 import org.eclipse.basyx.aas.metamodel.map.parts.Asset;
+import org.eclipse.basyx.extensions.aas.aggregator.authorization.AASAggregatorScopes;
 import org.eclipse.basyx.extensions.aas.aggregator.authorization.AuthorizedAASAggregator;
+import org.eclipse.basyx.extensions.aas.aggregator.authorization.SimpleRbacAASAggregatorAuthorizer;
+import org.eclipse.basyx.extensions.shared.authorization.BaSyxObjectTargetInformation;
+import org.eclipse.basyx.extensions.shared.authorization.JWTAuthenticationContextProvider;
+import org.eclipse.basyx.extensions.shared.authorization.KeycloakRoleAuthenticator;
+import org.eclipse.basyx.extensions.shared.authorization.NotAuthorized;
+import org.eclipse.basyx.extensions.shared.authorization.PredefinedSetRbacRuleChecker;
+import org.eclipse.basyx.extensions.shared.authorization.RbacRule;
+import org.eclipse.basyx.extensions.shared.authorization.RbacRuleSet;
 import org.eclipse.basyx.submodel.metamodel.api.identifier.IIdentifier;
-import org.eclipse.basyx.testsuite.regression.extensions.shared.mqtt.AuthorizationContextProvider;
-import org.eclipse.basyx.vab.exception.provider.ProviderException;
+import org.eclipse.basyx.testsuite.regression.extensions.shared.KeycloakAuthenticationContextProvider;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -48,24 +55,49 @@ import org.mockito.junit.MockitoJUnitRunner;
 /**
  * Tests authorization with the AuthorizedAASAggregator
  *
- * @author jungjan, fried, fischer
+ * @author jungjan, fried, fischer, wege
  */
 @RunWith(MockitoJUnitRunner.StrictStubs.class)
 public class TestAuthorizedAASAggregator {
 	@Mock
 	private IAASAggregator aggregatorMock;
-	private AuthorizedAASAggregator testSubject;
-	private AuthorizationContextProvider securityContextProvider = new AuthorizationContextProvider(AuthorizedAASAggregator.READ_AUTHORITY, AuthorizedAASAggregator.WRITE_AUTHORITY);
+	private AuthorizedAASAggregator<?> testSubject;
+	private KeycloakAuthenticationContextProvider securityContextProvider = new KeycloakAuthenticationContextProvider();
+	private RbacRuleSet rbacRuleSet = new RbacRuleSet();
+
+	private final String adminRole = "admin";
+	private final String readerRole = "reader";
 
 	@Before
 	public void setUp() {
-		testSubject = new AuthorizedAASAggregator(aggregatorMock);
+		rbacRuleSet.addRule(RbacRule.of(
+				adminRole,
+				AASAggregatorScopes.READ_SCOPE,
+				new BaSyxObjectTargetInformation("*", "*", "*")
+		));
+		rbacRuleSet.addRule(RbacRule.of(
+				adminRole,
+				AASAggregatorScopes.WRITE_SCOPE,
+				new BaSyxObjectTargetInformation("*", "*", "*")
+		));
+		rbacRuleSet.addRule(RbacRule.of(
+				readerRole,
+				AASAggregatorScopes.READ_SCOPE,
+				new BaSyxObjectTargetInformation("*", "*", "*")
+		));
+		testSubject = new AuthorizedAASAggregator<>(
+				aggregatorMock,
+				new SimpleRbacAASAggregatorAuthorizer<>(
+						new PredefinedSetRbacRuleChecker(rbacRuleSet),
+						new KeycloakRoleAuthenticator()
+				),
+				new JWTAuthenticationContextProvider()
+		);
 	}
 
 	@After
 	public void tearDown() {
 		securityContextProvider.clearContext();
-		Mockito.verifyNoMoreInteractions(aggregatorMock);
 	}
 
 	private AssetAdministrationShell invokeCreateAAS() {
@@ -75,22 +107,22 @@ public class TestAuthorizedAASAggregator {
 		return shell;
 	}
 
-	@Test(expected = ProviderException.class)
-	public void givenSecurityContextIsEmpty_whenCreateAAS_thenThrowProviderException() {
+	@Test(expected = NotAuthorized.class)
+	public void givenSecurityContextIsEmpty_whenCreateAAS_thenThrowNotAuthorized() {
 		securityContextProvider.setEmptySecurityContext();
 		invokeCreateAAS();
 	}
 
 	@Test
 	public void givenPrincipalHasWriteAuthority_whenCreateAAS_thenInvocationIsForwarded() {
-		securityContextProvider.setSecurityContextWithWriteAuthority();
-		AssetAdministrationShell shell = invokeCreateAAS();
+		securityContextProvider.setSecurityContextWithRoles(adminRole);
+		final AssetAdministrationShell shell = invokeCreateAAS();
 		Mockito.verify(aggregatorMock).createAAS(shell);
 	}
 
-	@Test(expected = ProviderException.class)
-	public void givenPrincipalIsMissingWriteAuthority_whenCreateAAS_thenThrowProviderException() {
-		securityContextProvider.setSecurityContextWithoutAuthorities();
+	@Test(expected = NotAuthorized.class)
+	public void givenPrincipalIsMissingWriteAuthority_whenCreateAAS_thenThrowNotAuthorized() {
+		securityContextProvider.setSecurityContextWithoutRoles();
 		invokeCreateAAS();
 	}
 
@@ -102,20 +134,20 @@ public class TestAuthorizedAASAggregator {
 
 	@Test
 	public void givenPrincipalHasWriteAuthority_whenDeleteAAS_thenInvocationIsForwarded() {
-		securityContextProvider.setSecurityContextWithWriteAuthority();
+		securityContextProvider.setSecurityContextWithRoles(adminRole);
 		final IIdentifier shellId = invokeDeleteAAS();
 		Mockito.verify(aggregatorMock).deleteAAS(shellId);
 	}
 
-	@Test(expected = ProviderException.class)
-	public void givenPrincipalIsMissingWriteAuthority_whenDeleteAAS_thenThrowProviderException() {
-		securityContextProvider.setSecurityContextWithoutAuthorities();
+	@Test(expected = NotAuthorized.class)
+	public void givenPrincipalIsMissingWriteAuthority_whenDeleteAAS_thenThrowNotAuthorized() {
+		securityContextProvider.setSecurityContextWithoutRoles();
 		invokeDeleteAAS();
 	}
 
 	@Test
 	public void givenPrincipalHasReadAuthority_whenGetAAS_thenInvocationIsForwarded() {
-		securityContextProvider.setSecurityContextWithReadAuthority();
+		securityContextProvider.setSecurityContextWithRoles(readerRole);
 
 		final IIdentifier shellId = new ModelUrn("urn:test1");
 		final AssetAdministrationShell expectedShell = new AssetAdministrationShell("test", shellId, new Asset());
@@ -126,9 +158,9 @@ public class TestAuthorizedAASAggregator {
 		Assert.assertEquals(expectedShell, shell);
 	}
 
-	@Test(expected = ProviderException.class)
-	public void givenPrincipalIsMissingReadAuthority_whenGetAAS_thenThrowProviderException() {
-		securityContextProvider.setSecurityContextWithoutAuthorities();
+	@Test(expected = NotAuthorized.class)
+	public void givenPrincipalIsMissingReadAuthority_whenGetAAS_thenThrowNotAuthorized() {
+		securityContextProvider.setSecurityContextWithoutRoles();
 
 		final IIdentifier shellId = new ModelUrn("urn:test1");
 
@@ -137,21 +169,28 @@ public class TestAuthorizedAASAggregator {
 
 	@Test
 	public void givenPrincipalHasReadAuthority_whenGetAASList_thenInvocationIsForwarded() {
-		securityContextProvider.setSecurityContextWithReadAuthority();
+		securityContextProvider.setSecurityContextWithRoles(readerRole);
 
 		final IIdentifier shellId = new ModelUrn("urn:test1");
-		final Collection<IAssetAdministrationShell> expectedAASDescriptorList = Collections.singletonList(new AssetAdministrationShell("test", shellId, new Asset()));
+		final IAssetAdministrationShell shell = new AssetAdministrationShell("test", shellId, new Asset());
+		final Collection<IAssetAdministrationShell> expectedAASDescriptorList = Collections.singletonList(shell);
 		Mockito.when(aggregatorMock.getAASList()).thenReturn(expectedAASDescriptorList);
+		Mockito.when(aggregatorMock.getAAS(shellId)).thenReturn(shell);
 
 		final Collection<IAssetAdministrationShell> shellList = testSubject.getAASList();
 
 		Assert.assertEquals(expectedAASDescriptorList, shellList);
 	}
 
-	@Test(expected = ProviderException.class)
-	public void givenPrincipalIsMissingReadAuthority_whenGetAASList_thenThrowProviderException() {
-		securityContextProvider.setSecurityContextWithoutAuthorities();
-
-		testSubject.getAASList();
+	@Test
+	public void givenPrincipalIsMissingReadAuthority_whenGetAASList_thenThrowNotAuthorized() {
+		securityContextProvider.setSecurityContextWithoutRoles();
+		final IIdentifier shellId = new ModelUrn("urn:test1");
+		final AssetAdministrationShell shell = new AssetAdministrationShell("test", shellId, new Asset());
+		final Collection<IAssetAdministrationShell> aasList = Collections.singletonList(shell);
+		Mockito.when(aggregatorMock.getAASList()).thenReturn(aasList);
+		//Mockito.when(aggregatorMock.getAAS(shellId)).thenReturn(shell);
+		final Collection<IAssetAdministrationShell> returnedAASList = testSubject.getAASList();
+		Assert.assertEquals(Collections.emptyList(), returnedAASList);
 	}
 }
