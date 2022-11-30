@@ -27,15 +27,27 @@ package org.eclipse.basyx.extensions.shared.authorization;
 import java.util.List;
 
 /**
- * Interface for checking attribute based access rules against some (potentially occurred)
- * role x right x (aas id, submodel id, submodel element id) combination.
+ * Interface for checking role based access rules against some target information.
  *
  * @author wege
  */
 public interface IRbacRuleChecker {
-  boolean checkRbacRuleIsSatisfied(
+  /**
+   * Checks if the given the given roles x action x target information tuple is satisfied
+   * in some context. The context with the rules to match against should originate from
+   * the implementing class.
+   *
+   * @param roles
+   *              a list of user roles as delivered by the auth provider, e.g. in a Keycloak access token.
+   * @param action
+   *              the action to check for like {@link org.eclipse.basyx.extensions.aas.aggregator.authorization.AASAggregatorScopes#READ_SCOPE}.
+   * @param targetInformation
+   *              the features of the target object which access should be checked for like {@link BaSyxObjectTargetInformation}.
+   * @return true if the rule is satisfied, false otherwise
+   */
+  public boolean checkRbacRuleIsSatisfied(
       final List<String> roles,
-      final String right,
-      final ITargetInformation targetInformation
+      final String action,
+      final TargetInformation targetInformation
   );
 }

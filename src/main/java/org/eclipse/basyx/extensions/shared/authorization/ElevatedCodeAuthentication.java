@@ -25,8 +25,8 @@
 package org.eclipse.basyx.extensions.shared.authorization;
 
 import java.util.Collections;
-import java.util.Deque;
-import java.util.LinkedList;
+import java.util.HashSet;
+import java.util.Set;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -36,8 +36,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
  *
  * @author wege
  */
-public class CodeAuthentication extends AbstractAuthenticationToken {
-  public CodeAuthentication() {
+public class ElevatedCodeAuthentication extends AbstractAuthenticationToken {
+  private static final ThreadLocal<Set<ElevatedCodeAuthenticationAreaHandler>> elevatedCodeAuthenticationAreaHandlers = ThreadLocal.withInitial(HashSet::new);
+  private static final ThreadLocal<SecurityContext> previousSecurityContext = new ThreadLocal<>();
+
+  public ElevatedCodeAuthentication() {
     super(Collections.emptyList());
   }
 
@@ -52,48 +55,48 @@ public class CodeAuthentication extends AbstractAuthenticationToken {
   }
 
   public static boolean isCodeAuthentication() {
-    return AuthenticationContextProvider.getAuthentication().map(CodeAuthentication.class::isInstance).orElse(false);
+    return AuthenticationContextProvider.getAuthentication().map(ElevatedCodeAuthentication.class::isInstance).orElse(false);
   }
 
-  public static class CodeAuthenticationAreaHandler implements AutoCloseable {
+  public static class ElevatedCodeAuthenticationAreaHandler implements AutoCloseable {
     @Override
     public void close() {
-      leaveCodeAuthenticationArea();
+      leaveElevatedCodeAuthenticationArea(this);
     }
   }
 
-  private static final ThreadLocal<Deque<CodeAuthenticationAreaHandler>> codeAuthenticationAreaHandlerStack = ThreadLocal.withInitial(
-      LinkedList::new);
+  private static void leaveElevatedCodeAuthenticationArea(final ElevatedCodeAuthenticationAreaHandler areaHandler) {
+    final var areaHandlers = elevatedCodeAuthenticationAreaHandlers.get();
+    if (!areaHandlers.contains(areaHandler)) {
+      return;
+    }
 
-  public static void leaveCodeAuthenticationArea() {
-    codeAuthenticationAreaHandlerStack.get().pop();
-    if (codeAuthenticationAreaHandlerStack.get().isEmpty()) {
-      unsetCodeAuthentication();
+    areaHandlers.remove(areaHandler);
+    if (areaHandlers.isEmpty()) {
+      unsetElevatedCodeAuthentication();
     }
   }
 
-  public static CodeAuthenticationAreaHandler enterCodeAuthenticationArea() {
-    final CodeAuthenticationAreaHandler handler = new CodeAuthenticationAreaHandler();
-    codeAuthenticationAreaHandlerStack.get().add(handler);
-    setCodeAuthentication();
+  public static ElevatedCodeAuthenticationAreaHandler enterElevatedCodeAuthenticationArea() {
+    final ElevatedCodeAuthenticationAreaHandler handler = new ElevatedCodeAuthenticationAreaHandler();
+    elevatedCodeAuthenticationAreaHandlers.get().add(handler);
+    setElevatedCodeAuthentication();
     return handler;
   }
 
-  private static final ThreadLocal<SecurityContext> previousSecurityContext = new ThreadLocal<>();
-
-  public static void setCodeAuthentication() {
-    if (SecurityContextHolder.getContext() != null && SecurityContextHolder.getContext().getAuthentication() instanceof CodeAuthentication) {
+  private static void setElevatedCodeAuthentication() {
+    if (SecurityContextHolder.getContext() != null && SecurityContextHolder.getContext().getAuthentication() instanceof ElevatedCodeAuthentication) {
       return;
     }
 
     previousSecurityContext.set(SecurityContextHolder.getContext());
 
     final SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
-    securityContext.setAuthentication(new CodeAuthentication());
+    securityContext.setAuthentication(new ElevatedCodeAuthentication());
     SecurityContextHolder.setContext(securityContext);
   }
 
-  public static void unsetCodeAuthentication() {
+  private static void unsetElevatedCodeAuthentication() {
     SecurityContextHolder.clearContext();
     if (previousSecurityContext.get() != null) {
       SecurityContextHolder.setContext(previousSecurityContext.get());

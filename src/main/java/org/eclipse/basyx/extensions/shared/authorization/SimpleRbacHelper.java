@@ -24,24 +24,24 @@
  ******************************************************************************/
 package org.eclipse.basyx.extensions.shared.authorization;
 
-import java.util.stream.Collectors;
-import org.eclipse.basyx.submodel.metamodel.api.identifier.IIdentifier;
-import org.eclipse.basyx.submodel.metamodel.api.reference.IKey;
-import org.eclipse.basyx.submodel.metamodel.api.reference.IReference;
+import java.util.List;
 
 /**
- * Utility methods for handling ids.
+ * Helper methods for RBAC access control scheme.
  *
  * @author wege
  */
-public class IdUtil {
-  private IdUtil() {}
+public class SimpleRbacHelper {
+  private SimpleRbacHelper() {}
 
-  public static String getIdentifierId(final IIdentifier identifier) {
-    return identifier != null ? identifier.getId() : null;
-  }
-
-  public static String getReferenceId(final IReference reference) {
-    return reference != null ? reference.getKeys().stream().map(IKey::getValue).collect(Collectors.joining(";")) : null;
+  public static <SubjectInformationType> void checkRule(final IRbacRuleChecker rbacRuleChecker, final IRoleAuthenticator<SubjectInformationType> roleAuthenticator, final SubjectInformationType subjectInformation, final String action, final TargetInformation targetInformation) throws SimpleRbacInhibitException {
+    final List<String> roles = roleAuthenticator.getRoles(subjectInformation);
+    if (!rbacRuleChecker.checkRbacRuleIsSatisfied(
+        roles,
+        action,
+        targetInformation
+    )) {
+      throw new SimpleRbacInhibitException(roles, action, targetInformation);
+    }
   }
 }

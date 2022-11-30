@@ -1,6 +1,6 @@
 /*******************************************************************************
- * Copyright (C) 2021 the Eclipse BaSyx Authors
- *
+ * Copyright (C) 2022 the Eclipse BaSyx Authors
+ * 
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
@@ -8,10 +8,10 @@
  * distribute, sublicense, and/or sell copies of the Software, and to
  * permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- *
+ * 
  * The above copyright notice and this permission notice shall be
  * included in all copies or substantial portions of the Software.
- *
+ * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -19,29 +19,27 @@
  * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
+ * 
  * SPDX-License-Identifier: MIT
  ******************************************************************************/
-package org.eclipse.basyx.extensions.shared.authorization;
 
-import java.util.List;
+
+package org.eclipse.basyx.extensions.shared.encoding;
+
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 
 /**
- * Utility methods for RBAC access control scheme.
+ * Encoder supporting Base64URL encoding
+ * 
+ * @author schnicke
  *
- * @author wege
  */
-public class SimpleRbacUtil {
-  private SimpleRbacUtil() {}
+public class Base64URLEncoder implements IEncoder {
 
-  public static <SubjectInformationType> void checkRule(final IRbacRuleChecker rbacRuleChecker, final IRoleAuthenticator<SubjectInformationType> roleAuthenticator, final SubjectInformationType subjectInformation, final String action, final ITargetInformation targetInformation) throws SimpleRbacInhibitException {
-    final List<String> roles = roleAuthenticator.getRoles(subjectInformation);
-    if (!rbacRuleChecker.checkRbacRuleIsSatisfied(
-        roles,
-        action,
-        targetInformation
-    )) {
-      throw new SimpleRbacInhibitException(roles, action, targetInformation);
-    }
-  }
+	@Override
+	public String encode(String toEncode) {
+		return Base64.getUrlEncoder().withoutPadding().encodeToString(toEncode.getBytes(StandardCharsets.UTF_8));
+	}
+
 }

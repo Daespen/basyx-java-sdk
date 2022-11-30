@@ -1,6 +1,6 @@
 /*******************************************************************************
- * Copyright (C) 2021 the Eclipse BaSyx Authors
- *
+ * Copyright (C) 2022 the Eclipse BaSyx Authors
+ * 
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
  * "Software"), to deal in the Software without restriction, including
@@ -8,10 +8,10 @@
  * distribute, sublicense, and/or sell copies of the Software, and to
  * permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
- *
+ * 
  * The above copyright notice and this permission notice shall be
  * included in all copies or substantial portions of the Software.
- *
+ * 
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
@@ -19,28 +19,26 @@
  * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
  * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
  * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- *
+ * 
  * SPDX-License-Identifier: MIT
  ******************************************************************************/
-package org.eclipse.basyx.extensions.shared.authorization;
 
-import org.springframework.security.core.GrantedAuthority;
+
+package org.eclipse.basyx.extensions.shared.encoding;
+
+import org.eclipse.basyx.vab.modelprovider.VABPathTools;
 
 /**
- * Utility methods for Granted Authority access control scheme.
+ * Encoder supporting URL encoding
+ * 
+ * @author schnicke
  *
- * @author wege
  */
-public class GrantedAuthorityUtil {
-  private GrantedAuthorityUtil() {}
+public class URLEncoder implements IEncoder {
 
-  public static <SubjectInformationType> void checkAuthority(final IGrantedAuthorityAuthenticator<SubjectInformationType> grantedAuthorityAuthenticator, final SubjectInformationType subjectInformation, final String requiredAuthority) throws InhibitException {
-    if (grantedAuthorityAuthenticator.getAuthorities(subjectInformation).stream()
-        .map(GrantedAuthority::getAuthority)
-        .noneMatch(authority -> authority.equals(requiredAuthority))) {
-      //final Supplier<InhibitException> effectiveInhibitExceptionSupplier = inhibitExceptionSupplier == null ? () -> new GrantedAuthorityInhibitException(requiredAuthority) : inhibitExceptionSupplier;
-      //throw inhibitExceptionSupplier.get();
-      throw new GrantedAuthorityInhibitException(requiredAuthority);
-    }
-  }
+	@Override
+	public String encode(String toEncode) {
+		return VABPathTools.encodePathElement(toEncode);
+	}
+
 }

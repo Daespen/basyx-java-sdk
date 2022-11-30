@@ -38,7 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A set of {@link RbacRule} used in policy enforcement points or in policy information points.
+ * A set of {@link RbacRule} used in authorization points or in policy information points.
  *
  * @author wege
  */
@@ -83,14 +83,25 @@ public class RbacRuleSet {
 			}
 			final InputStreamReader inputStreamReader = new InputStreamReader(inputStream);
 			final JsonReader jsonReader = new JsonReader(inputStreamReader);
-			final RbacRule[] rbacRules = new Gson().fromJson(jsonReader, RbacRule[].class);
+			final RbacRuleDTO[] rbacRuleDTOs = new Gson().fromJson(jsonReader, RbacRuleDTO[].class);
+
+			final RbacRule[] rbacRules = Arrays.stream(rbacRuleDTOs).map(RbacRuleSet::convertRbacRuleDTOToRbacRule).toArray(RbacRule[]::new);
+
 			logger.info("Read rbac rules: {}", Arrays.toString(rbacRules));
 			final RbacRuleSet rbacRuleSet = new RbacRuleSet();
 			Arrays.stream(rbacRules).forEach(rbacRuleSet::addRule);
 			return rbacRuleSet;
-		} catch (IOException e) {
+		} catch (final IOException e) {
 			logger.error(e.getMessage(), e);
 		}
 		return new RbacRuleSet();
+	}
+
+	private static RbacRule convertRbacRuleDTOToRbacRule(final RbacRuleDTO dto) {
+		final TargetInformation targetInformation = new EmptyTargetInformation();
+
+		targetInformation.putAll(dto.getTargetInformation());
+
+		return new RbacRule(dto.getRole(), dto.getAction(), targetInformation);
 	}
 }
